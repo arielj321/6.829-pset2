@@ -1,9 +1,18 @@
 #include <iostream>
+#include <set>
+#include <queue>
+#include <set>
+#include <ctime>
+#include <math.h>
 
 #include "controller.hh"
 #include "timestamp.hh"
 
 using namespace std;
+
+float i = 10;
+std::priority_queue< pair<int,int>, std::vector<pair<int,int>>, std::greater<pair<int,int>>> outstandingPackets;
+std::set<int> receivedPackets;
 
 /* Default constructor */
 Controller::Controller( const bool debug )
@@ -14,7 +23,7 @@ Controller::Controller( const bool debug )
 unsigned int Controller::window_size( void )
 {
   /* Default: fixed window size of 100 outstanding datagrams */
-  unsigned int the_window_size = 50;
+  unsigned int the_window_size = i;
 
   if ( debug_ ) {
     cerr << "At time " << timestamp_ms()
@@ -30,7 +39,8 @@ void Controller::datagram_was_sent( const uint64_t sequence_number,
 				    const uint64_t send_timestamp )
                                     /* in milliseconds */
 {
-  /* Default: take no action */
+
+  outstandingPackets.push(std::make_pair(send_timestamp, sequence_number));
 
   if ( debug_ ) {
     cerr << "At time " << send_timestamp
@@ -48,8 +58,42 @@ void Controller::ack_received( const uint64_t sequence_number_acked,
 			       const uint64_t timestamp_ack_received )
                                /* when the ack was received (by sender) */
 {
-  /* Default: take no action */
+  cerr << i << endl;
 
+  // AIMD
+  receivedPackets.insert(sequence_number_acked);
+  std::pair<int,int> oldestPacket;
+  bool is_in;
+  oldestPacket = outstandingPackets.top();
+  outstandingPackets.pop();
+  is_in = receivedPackets.find(oldestPacket.second) != receivedPackets.end();
+  while(is_in) {
+    receivedPackets.erase(oldestPacket.second);
+    oldestPacket = outstandingPackets.top();
+    outstandingPackets.pop();
+    is_in = receivedPackets.find(oldestPacket.second) != receivedPackets.end();
+  };
+
+  if(timestamp_ack_received - oldestPacket.first > timeout_ms()) {
+    i *= .7;
+  }
+  else {
+    i += 1.2/i;
+  }
+  if(i<2){
+    i=2;
+  }
+
+  // Delay Scheme
+  /*if(i<2){
+    i=2;
+  }
+  if(timestamp_ack_received-send_timestamp_acked > 300) {
+    i /= 2.1;
+  }
+  else {
+    i += .08/i;
+  }*/
   if ( debug_ ) {
     cerr << "At time " << timestamp_ack_received
 	 << " received ack for datagram " << sequence_number_acked

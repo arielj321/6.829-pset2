@@ -1,0 +1,6 @@
+#!/bin/bash
+cd ..;
+./autogen.sh && ./configure && make;
+cd datagrump;
+echo "$1" >> ~/Desktop/vBox/log.log;
+./run-contest arielj | grep http | sed -e 's, ,,g' >> ~/Desktop/vBox/log.log;
